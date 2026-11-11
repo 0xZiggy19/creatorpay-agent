@@ -41,10 +41,8 @@ Keep replies short, friendly and skimmable (bullets for lists, amounts with curr
 
 export async function runAgent(messages: { role: "user" | "assistant"; content: string }[]): Promise<AgentResponse> {
   const m = getModel();
-  if (!m) {
-    const last = [...messages].reverse().find((x) => x.role === "user")?.content ?? "";
-    return fallbackRespond(last, await listInvoices());
-  }
+  const last = [...messages].reverse().find((x) => x.role === "user")?.content ?? "";
+  if (!m) return fallbackRespond(last, listInvoices);
 
   let draft: InvoiceDraft | undefined;
   let invoices: InvoiceSummary[] | undefined;
@@ -106,13 +104,22 @@ export async function runAgent(messages: { role: "user" | "assistant"; content: 
     }),
   };
 
-  const result = await generateText({
-    model: m.model,
-    system: systemPrompt(),
-    messages: messages as ModelMessage[],
-    tools,
-    stopWhen: isStepCount(6),
-  });
+  let result;
+  try {
+    result = await generateText({
+      model: m.model,
+      system: systemPrompt(),
+      messages: messages as ModelMessage[],
+      tools,
+      stopWhen: isStepCount(6),
+    });
+  } catch (e) {
+    // Provider/gateway outage or billing issue: keep the demo usable with the rule-based parser.
+    const reason = e instanceof Error ? e.message : String(e);
+    console.error("AI call failed, using rule-based fallback:", reason);
+    if (/PayPal/.test(reason)) throw e;
+    return fallbackRespond(last, listInvoices, "Rule-based fallback (AI provider unavailable)");
+  }
 
   return {
     reply: result.text || (draft ? "Here's your invoice preview — confirm to send it via PayPal." : "Done."),

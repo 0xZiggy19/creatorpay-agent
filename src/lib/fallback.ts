@@ -55,7 +55,7 @@ export function parseInvoice(text: string): { draft?: InvoiceDraft; missing: str
   else if (/£|\bgbp\b/i.test(text)) currency = "GBP";
   else if (/\bcad\b/i.test(text)) currency = "CAD";
 
-  const amtMatch = text.match(/[$€£]\s?(\d[\d,]*(?:\.\d{1,2})?)\s*(k)?/i) || text.match(/(\d[\d,]*(?:\.\d{1,2})?)\s*(k)?\s*(?:usd|eur|gbp|cad|dollars)/i);
+  const amtMatch = text.match(/[$€£]\s?(\d[\d,]*(?:\.\d{1,2})?)\s*(k)?/i) || text.match(/(\d[\d,]*(?:\.\d{1,2})?)\s*(k)?\s*(?:usd|eur|gbp|cad|dollars)/i) || text.match(/\b(\d[\d,]*(?:\.\d{1,2})?)\s*(k)\b/i);
   const amount = amtMatch ? Number(amtMatch[1].replace(/,/g, "")) * (amtMatch[2] ? 1000 : 1) : NaN;
   const each = /\beach\b|\bper\b|\/\s?(post|video|hour|thread)/i.test(text);
   if (!amount) missing.push("the amount");
@@ -90,9 +90,10 @@ export function parseInvoice(text: string): { draft?: InvoiceDraft; missing: str
   };
 }
 
-export function fallbackRespond(text: string, invoices: InvoiceSummary[]): AgentResponse {
+export async function fallbackRespond(text: string, loadInvoices: () => Promise<InvoiceSummary[]>, engine = "Rule-based fallback (no AI key)"): Promise<AgentResponse> {
   const t = text.toLowerCase();
-  const engine = "Rule-based fallback (no AI key)";
+  const needsInvoices = /remind|nudge|follow up|chase/.test(t) || (/who|unpaid|hasn'?t paid|haven'?t paid|owe|overdue|outstanding|status|list|show|pending|paid me/.test(t) && !/@/.test(t));
+  const invoices = needsInvoices ? await loadInvoices() : [];
   const fmt = (i: InvoiceSummary) => `${i.currency} ${i.amountDue.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
   if (/remind|nudge|follow up|chase/.test(t)) {
