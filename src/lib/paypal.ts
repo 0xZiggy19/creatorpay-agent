@@ -141,8 +141,14 @@ function fromPayPal(inv: any): InvoiceSummary {
     dueDate: inv.detail?.payment_term?.due_date,
     note: inv.detail?.note,
     items,
-    payerViewUrl: inv.detail?.metadata?.recipient_view_url,
+    // The list endpoint omits metadata.recipient_view_url, so derive the hosted pay page from the invoice id.
+    payerViewUrl: inv.detail?.metadata?.recipient_view_url || (inv.status !== "DRAFT" ? payerUrlFor(inv.id) : undefined),
   });
+}
+
+function payerUrlFor(id: string): string {
+  const web = BASE.includes("sandbox") ? "https://www.sandbox.paypal.com" : "https://www.paypal.com";
+  return `${web}/invoice/p/#${String(id).replace(/^INV2-/, "").replace(/-/g, "")}`;
 }
 
 function toPayPalBody(d: InvoiceDraft, invoiceNumber?: string) {

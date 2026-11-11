@@ -26,7 +26,7 @@ export function StatusPill({ inv }: { inv: Pick<InvoiceSummary, "status" | "over
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${STATUS_STYLES[key] ?? STATUS_STYLES.DRAFT}`}>
       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {key.replace(/_/g, " ")}
+      {key === "MARKED_AS_PAID" ? "PAID · RECORDED" : key.replace(/_/g, " ")}
     </span>
   );
 }

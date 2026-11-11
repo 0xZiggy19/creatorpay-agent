@@ -46,20 +46,24 @@ export function InvoicePreview({
         </div>
         <span className="text-[11px] text-zinc-400">{state === "sent" ? "Sent" : "Review before sending"}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3 px-4 py-3">
-        <label className="space-y-1">
-          <span className="text-[11px] text-zinc-500 uppercase">Bill to</span>
+      <div className="grid grid-cols-6 gap-x-3 gap-y-2 px-4 py-3">
+        <label className="col-span-3 space-y-1">
+          <span className="text-[11px] text-zinc-500 uppercase">Company</span>
+          <input disabled={locked} className={field} placeholder="—" value={d.businessName ?? ""} onChange={(e) => setD({ ...d, businessName: e.target.value || undefined })} />
+        </label>
+        <label className="col-span-3 space-y-1">
+          <span className="text-[11px] text-zinc-500 uppercase">Contact</span>
           <input disabled={locked} className={field} value={d.recipientName} onChange={(e) => setD({ ...d, recipientName: e.target.value })} />
         </label>
-        <label className="space-y-1">
+        <label className="col-span-3 space-y-1">
           <span className="text-[11px] text-zinc-500 uppercase">Email</span>
           <input disabled={locked} className={field} value={d.recipientEmail} onChange={(e) => setD({ ...d, recipientEmail: e.target.value })} />
         </label>
-        <label className="space-y-1">
+        <label className="col-span-2 space-y-1">
           <span className="text-[11px] text-zinc-500 uppercase">Due date</span>
           <input disabled={locked} type="date" className={field} value={d.dueDate} onChange={(e) => setD({ ...d, dueDate: e.target.value })} />
         </label>
-        <label className="space-y-1">
+        <label className="col-span-1 space-y-1">
           <span className="text-[11px] text-zinc-500 uppercase">Currency</span>
           <input disabled={locked} className={field} value={d.currency} maxLength={3} onChange={(e) => setD({ ...d, currency: e.target.value.toUpperCase() })} />
         </label>

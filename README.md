@@ -31,7 +31,7 @@ Then you can just ask:
 - 📊 **Live dashboard.** Invoiced, paid, outstanding and overdue totals, plus every invoice with its live PayPal status (DRAFT / SENT / PAID / CANCELLED …) and overdue days.
 - 🤖 **Agentic queries.** For "Who owes me?" and "What's overdue?", the agent decides which tools to call and answers from live data.
 - ✉️ **AI payment reminders.** The agent drafts the reminder and PayPal delivers it (`/remind`). There's one-click *Remind* on any open invoice.
-- ✅ **Mark paid (sandbox demo).** Records a payment through PayPal's record-payment endpoint, so you can show the full lifecycle in a demo.
+- ✅ **Mark paid.** Records an external payment (bank transfer, crypto and so on) through PayPal's record-payment endpoint, and the invoice becomes `MARKED_AS_PAID`. Invoices the client pays on PayPal's pay page show up as `PAID`.
 - 🧪 **Mock mode.** With no PayPal keys, the app runs against an in-memory store with the same interface. This makes it easy to develop and demo offline.
 - 🛟 **Rule-based fallback.** With no AI key, a deterministic parser stands in for the LLM so the UI never breaks. The badge in the header always shows which engine is active.
 
@@ -143,9 +143,13 @@ Deploy to Vercel or Render as a standard Next.js app and set the env vars above.
 
 ## Screenshots
 
-| Agent drafts the invoice | Sent and tracked | AI payment reminder |
+All screenshots below are **live**: PayPal sandbox plus Gemini (`gemini-3.5-flash-lite`).
+
+| AI drafts the invoice | "Who hasn't paid me?" + AI reminder | Reminder sent via PayPal |
 |---|---|---|
-| ![](docs/screenshot-preview.png) | ![](docs/screenshot-sent.png) | ![](docs/screenshot-reminder.png) |
+| ![](docs/screenshot-preview.png) | ![](docs/screenshot-unpaid.png) | ![](docs/screenshot-reminder.png) |
+
+![Live dashboard](docs/screenshot-home.png)
 
 ## License
 

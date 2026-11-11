@@ -16,7 +16,7 @@ const SUGGESTIONS = [
 ];
 
 function renderText(t: string) {
-  return t.split("\n").map((line, i) => (
+  return t.replace(/`([^`]+)`/g, "$1").replace(/^\s*[*-]\s+/gm, "• ").split("\n").map((line, i) => (
     <p key={i} className={line.trim() === "" ? "h-2" : ""}>
       {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) => (part.startsWith("**") ? <strong key={j}>{part.slice(2, -2)}</strong> : part))}
     </p>

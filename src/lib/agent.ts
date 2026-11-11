@@ -31,11 +31,13 @@ Today is ${weekdayName(today)}, ${today}. Resolve relative dates ("Friday", "nex
 
 You manage real PayPal invoices through tools:
 - prepare_invoice: when the user wants to bill someone. Extract recipient, email, line items, currency (default USD), due date (default 14 days from today if not given) and write a short warm note.
-  If the user gives a total for N units, set quantity=N and unitAmount=total/N. Never invent an email address: if it's missing, ask for it instead of calling the tool.
+  If the user gives a total for N identical units, set quantity=N and unitAmount=total/N. If one total covers different deliverables and no per-item prices were given, use ONE line item that lists all deliverables (don't invent a price split). Never invent an email address: if it's missing, ask for it instead of calling the tool.
   This only prepares a preview; the user confirms in the UI before it is created and sent via PayPal.
 - list_invoices: to answer anything about invoice status, who has/hasn't paid, totals, overdue clients, or before writing a reminder.
 - prepare_reminder: to draft a polite payment reminder for an unpaid invoice (call list_invoices first to get the invoiceId). Write a warm, professional, concise note (3-5 sentences) in the creator's voice, mentioning the invoice number, amount and due date. The user reviews it, then it's sent through PayPal's reminder endpoint.
 
+If the client is a company, always set businessName to the company name (recipientName = the contact person if given, otherwise the company name). Always write a short warm note. Use Title Case for line-item names.
+Reminders are written in first person by the creator${process.env.CREATOR_NAME ? ` and signed "${process.env.CREATOR_NAME}"` : " with no name in the sign-off (just \"Thanks!\" or \"Best,\")"}. Never sign as "CreatorPay". Reminder subjects look like "Friendly reminder: invoice #0001" (never say the invoice is "from" the client).
 Only mention clients, emails and invoices exactly as returned by tools; never guess an email from a different client.
 Keep replies short, friendly and skimmable (bullets for lists, amounts with currency). Don't repeat everything the preview card already shows.`;
 }
@@ -140,7 +142,7 @@ export async function runAgent(messages: { role: "user" | "assistant"; content: 
   const m = used;
   const total = draft ? draft.items.reduce((s, i) => s + i.quantity * i.unitAmount, 0) : 0;
   const defaultReply = draft
-    ? `Here's the invoice for ${draft.recipientName}: ${draft.currency} ${total.toFixed(2)}, due ${weekdayName(draft.dueDate)} ${draft.dueDate}. Review it and hit **Create & send via PayPal**.`
+    ? `Here's the invoice for ${draft.businessName || draft.recipientName}: ${draft.currency} ${total.toFixed(2)}, due ${weekdayName(draft.dueDate)} ${draft.dueDate}. Review it and hit **Create & send via PayPal**.`
     : reminder
       ? `Here's a reminder for ${reminder.recipientName} (${reminder.invoiceNumber}). Tweak it if you like, then send it via PayPal.`
       : "Done.";
