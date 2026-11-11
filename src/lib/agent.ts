@@ -1,7 +1,7 @@
 import "server-only";
-import { generateText, tool, isStepCount, type ModelMessage } from "ai";
+import { generateText, tool, isStepCount, hasToolCall, type ModelMessage } from "ai";
 import { z } from "zod";
-import { getModel } from "./ai";
+import { getModelChain } from "./ai";
 import { listInvoices, getInvoice } from "./paypal";
 import { fallbackRespond } from "./fallback";
 import { todayISO, weekdayName } from "./dates";
@@ -36,13 +36,14 @@ You manage real PayPal invoices through tools:
 - list_invoices: to answer anything about invoice status, who has/hasn't paid, totals, overdue clients, or before writing a reminder.
 - prepare_reminder: to draft a polite payment reminder for an unpaid invoice (call list_invoices first to get the invoiceId). Write a warm, professional, concise note (3-5 sentences) in the creator's voice, mentioning the invoice number, amount and due date. The user reviews it, then it's sent through PayPal's reminder endpoint.
 
+Only mention clients, emails and invoices exactly as returned by tools; never guess an email from a different client.
 Keep replies short, friendly and skimmable (bullets for lists, amounts with currency). Don't repeat everything the preview card already shows.`;
 }
 
 export async function runAgent(messages: { role: "user" | "assistant"; content: string }[]): Promise<AgentResponse> {
-  const m = getModel();
+  const chain = getModelChain();
   const last = [...messages].reverse().find((x) => x.role === "user")?.content ?? "";
-  if (!m) return fallbackRespond(last, listInvoices);
+  if (!chain.length) return fallbackRespond(last, listInvoices);
 
   let draft: InvoiceDraft | undefined;
   let invoices: InvoiceSummary[] | undefined;
@@ -105,24 +106,47 @@ export async function runAgent(messages: { role: "user" | "assistant"; content: 
   };
 
   let result;
-  try {
-    result = await generateText({
-      model: m.model,
-      system: systemPrompt(),
-      messages: messages as ModelMessage[],
-      tools,
-      stopWhen: isStepCount(6),
-    });
-  } catch (e) {
-    // Provider/gateway outage or billing issue: keep the demo usable with the rule-based parser.
-    const reason = e instanceof Error ? e.message : String(e);
-    console.error("AI call failed, using rule-based fallback:", reason);
-    if (/PayPal/.test(reason)) throw e;
+  let used = chain[0];
+  let lastError = "";
+  for (const m of chain) {
+    draft = undefined;
+    invoices = undefined;
+    reminder = undefined;
+    toolsUsed.length = 0;
+    try {
+      result = await generateText({
+        model: m.model,
+        system: systemPrompt(),
+        messages: messages as ModelMessage[],
+        tools,
+        // Stop as soon as a preview card is ready: the UI shows it, so no extra LLM round-trip is needed.
+        stopWhen: [isStepCount(5), hasToolCall("prepare_invoice"), hasToolCall("prepare_reminder")],
+        maxRetries: 1,
+        abortSignal: AbortSignal.timeout(Number(process.env.AI_TIMEOUT_MS || 15000)),
+      });
+      used = m;
+      break;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+      if (/PayPal/.test(lastError)) throw e;
+      console.error(`AI call failed on ${m.modelId}:`, lastError.slice(0, 300));
+    }
+  }
+  if (!result) {
+    // Provider outage, rate limit or billing issue: keep the demo usable with the rule-based parser.
+    console.error("All AI models failed, using rule-based fallback:", lastError.slice(0, 200));
     return fallbackRespond(last, listInvoices, "Rule-based fallback (AI provider unavailable)");
   }
+  const m = used;
+  const total = draft ? draft.items.reduce((s, i) => s + i.quantity * i.unitAmount, 0) : 0;
+  const defaultReply = draft
+    ? `Here's the invoice for ${draft.recipientName}: ${draft.currency} ${total.toFixed(2)}, due ${weekdayName(draft.dueDate)} ${draft.dueDate}. Review it and hit **Create & send via PayPal**.`
+    : reminder
+      ? `Here's a reminder for ${reminder.recipientName} (${reminder.invoiceNumber}). Tweak it if you like, then send it via PayPal.`
+      : "Done.";
 
   return {
-    reply: result.text || (draft ? "Here's your invoice preview — confirm to send it via PayPal." : "Done."),
+    reply: result.text || defaultReply,
     draft,
     invoices,
     reminder,

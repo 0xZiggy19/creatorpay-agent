@@ -71,7 +71,7 @@ src/
     api/status/route.ts              # which PayPal mode / AI model is active
   lib/
     agent.ts      # system prompt + tools (prepare_invoice, list_invoices, prepare_reminder)
-    ai.ts         # model selection (AI Gateway → OpenAI → none)
+    ai.ts         # model selection (Gemini → AI Gateway → OpenAI → none)
     paypal.ts     # PayPal OAuth + Invoicing v2 client, plus mock store
     fallback.ts   # rule-based parser used only when no AI key is set
   components/     # InvoicePreview, ReminderCard, Dashboard
@@ -96,7 +96,8 @@ All calls go to `https://api-m.sandbox.paypal.com` (configurable through `PAYPAL
 ## AI tools used and how
 
 - **Vercel AI SDK** (`ai` v7): `generateText` with **tool calling** and a multi-step tool loop (`stopWhen: isStepCount(6)`). Tool inputs are defined with **Zod** schemas, so model output is validated before use.
-- **LLM**: via the **Vercel AI Gateway** (default `openai/gpt-5.4-mini`, and any gateway model can be set with `AI_MODEL`), or OpenAI directly with `OPENAI_API_KEY`.
+- **LLM**: **Google Gemini** (`@ai-sdk/google`, default `gemini-3.5-flash-lite` (fast, and strong at tool calling) with automatic fallback to `gemini-3.5-flash` / `gemini-flash-latest` when one is rate-limited) when `GEMINI_API_KEY` is set; otherwise the **Vercel AI Gateway** (default `openai/gpt-5.4-mini`, override with `AI_MODEL`) or OpenAI directly with `OPENAI_API_KEY`.
+- **Efficient agent loop:** the loop stops as soon as a preview card is ready (`hasToolCall`), and each call has a timeout and a single retry. That keeps it fast and inside free-tier limits.
 - **Agent tools:**
   - `prepare_invoice` extracts recipient, email, line items (it splits totals across quantities), currency, due date and a note into a structured draft. It never invents email addresses and asks instead.
   - `list_invoices` fetches live invoices from PayPal, filtered as all / unpaid / overdue / paid. This powers questions like "who hasn't paid me?"
@@ -127,7 +128,9 @@ npm run dev                  # http://localhost:3000
 | `PAYPAL_CLIENT_SECRET` | for real mode | PayPal REST app secret |
 | `PAYPAL_API_BASE` | no | Defaults to `https://api-m.sandbox.paypal.com` |
 | `PAYPAL_INVOICER_NAME` / `PAYPAL_INVOICER_BUSINESS` | no | Invoicer name/business shown on invoices |
-| `AI_GATEWAY_API_KEY` | one AI key | Vercel AI Gateway key (recommended) |
+| `GEMINI_API_KEY` | one AI key | Google Gemini key (preferred when set) |
+| `GEMINI_MODEL` | no | Comma-separated Gemini model chain |
+| `AI_GATEWAY_API_KEY` | one AI key | Vercel AI Gateway key |
 | `OPENAI_API_KEY` | one AI key | OpenAI key (alternative) |
 | `OPENAI_BASE_URL` | no | Any OpenAI-compatible endpoint |
 | `AI_MODEL` | no | Model override |
