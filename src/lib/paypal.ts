@@ -9,6 +9,9 @@ import { addDays, daysBetween, todayISO } from "./dates";
  */
 
 const BASE = process.env.PAYPAL_API_BASE || "https://api-m.sandbox.paypal.com";
+if (!BASE.includes("sandbox") && process.env.PAYPAL_ALLOW_LIVE !== "true") {
+  throw new Error("Refusing to use the live PayPal API. Set PAYPAL_ALLOW_LIVE=true if you really mean to send real invoices.");
+}
 
 export function paypalMode(): "sandbox" | "mock" {
   return process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET ? "sandbox" : "mock";
@@ -36,7 +39,14 @@ async function getAccessToken(): Promise<string> {
     body: "grant_type=client_credentials",
     cache: "no-store",
   });
-  if (!res.ok) throw new PayPalError(`PayPal auth failed (${res.status})`, res.status, await safeJson(res));
+  if (!res.ok) {
+    const body = (await safeJson(res)) as { error?: string; error_description?: string } | null;
+    const hint =
+      body?.error === "invalid_client" && BASE.includes("sandbox")
+        ? " — these credentials were rejected by the sandbox. Make sure you copied the Client ID/Secret from the *Sandbox* tab in developer.paypal.com (live keys don't work against the sandbox)."
+        : "";
+    throw new PayPalError(`PayPal auth failed (${res.status}${body?.error ? ` ${body.error}` : ""})${hint}`, res.status, body);
+  }
   const data = (await res.json()) as { access_token: string; expires_in: number };
   cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 };
   return data.access_token;
