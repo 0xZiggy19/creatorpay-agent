@@ -61,7 +61,7 @@ async function safeJson(res: Response): Promise<unknown> {
   }
 }
 
-async function pp<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+async function pp<T = unknown>(path: string, init: RequestInit & { json?: unknown } = {}, retried = false): Promise<T> {
   const token = await getAccessToken();
   const { json, headers, ...rest } = init;
   const res = await fetch(`${BASE}${path}`, {
@@ -76,7 +76,19 @@ async function pp<T = unknown>(path: string, init: RequestInit & { json?: unknow
     cache: "no-store",
   });
   const body = await safeJson(res);
+  // A cached token may predate a scope change (e.g. Invoicing just enabled on the app): refresh once.
+  if ((res.status === 401 || res.status === 403) && !retried) {
+    cachedToken = null;
+    return pp<T>(path, init, true);
+  }
   if (!res.ok) {
+    if (res.status === 403 && (body as { name?: string } | null)?.name === "NOT_AUTHORIZED") {
+      throw new PayPalError(
+        "PayPal 403 NOT_AUTHORIZED: this REST app doesn't have the Invoicing permission. In developer.paypal.com → Apps & Credentials (Sandbox) → your app → Features, tick \"Invoicing\" and save, then retry.",
+        403,
+        body
+      );
+    }
     const b = body as { message?: string; details?: { issue?: string; description?: string }[] } | null;
     const detail = b?.details?.[0]?.description || b?.details?.[0]?.issue;
     throw new PayPalError(`PayPal ${res.status}: ${b?.message || "request failed"}${detail ? ` — ${detail}` : ""}`, res.status, body);
