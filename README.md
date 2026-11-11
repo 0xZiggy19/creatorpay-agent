@@ -2,6 +2,8 @@
 
 **Say the deal. Get paid.** An AI invoicing agent for creators and freelancers, built on the **PayPal Invoicing API** and the **Vercel AI SDK**.
 
+> 🔴 **Live demo:** https://creatorpay-agent-phi.vercel.app (PayPal sandbox + Gemini)
+>
 > Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) by [@0xZiggy_eth](https://x.com/0xZiggy_eth).
 
 ![CreatorPay Agent](docs/screenshot-preview.png)
